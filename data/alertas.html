@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<head>
+  <meta charset="UTF-8">
+  <title>Configuracion</title>
+  <link rel="stylesheet" href="./style.css">
+    <title>Configuracion</title>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta http-equiv="X-UA-Compatible" content="ie=edge" />
+  <!--Import materialize.css-->
+  <!--Let browser know website is optimized for mobile-->
+  <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css" integrity="sha384-ggOyR0iXCbMQv3Xipma34MD+dH/1fQ784/j6cY/iJTQUOhcWr7x9JvoRxT2MZw1T" crossorigin="anonymous">
+  <link rel="stylesheet" href="./style.css">
+  <link rel="shortcut icon" sizes="196x196" href="https://adax-solaire.co.uk/wp-content/uploads/2018/06/WiFi-Connectivity.png">
+  <link rel="manifest" href="manifest.json">
+  <style>
+  a {
+
+    color:#ffffff;
+    font-size:25px;
+    font-family: fantasy;
+    padding:8px 10px;
+    height: 30px;
+    width: 80px;
+    border-radius:15px;
+    -moz-border-radius:3px;
+    -webkit-border-radius:3px;
+    text-decoration:none;
+    
+    display: inline-block; /* Added */
+  }
+    </style>
+ 
+</head>
+	
+<body onload="WatchTaskTable()">
+    <div class="container">
+        <div style=" padding:8px 12px;">
+            <a onclick="javascript:history.back()">REGRESAR</a></div>
+    <div style="text-align: center;margin-top: 5px"> <h2>Alertas</h2> </div>
+  <table class="table table-dark" style="margin-top: 30px;">
+    <thead>
+      <tr>
+        <th scope="col">#</th>
+        <th scope="col">Descripcion</th>
+       
+      </tr>
+    </thead>
+    <tbody id="loadLog">
+
+    </tbody>
+  </table>
+</div>
+
+
+<!-- partial -->  
+  <script src="https://www.gstatic.com/firebasejs/7.3.0/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/3.1.0/firebase-database.js"></script>
+  <script  src="index.js"></script>
+  
+</body>
+</html>

@@ -1,0 +1,479 @@
+<!DOCTYPE html>
+<html>
+
+  <head>
+    <meta charset="UTF-8">
+    <title>Smart Car Wifi</title>
+    <link rel="shortcut icon" sizes="196x196" href="https://adax-solaire.co.uk/wp-content/uploads/2018/06/WiFi-Connectivity.png">
+    <!--Import Google Icon Font-->
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+    <!--Import materialize.css-->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/css/materialize.min.css">
+    <script src="https://code.jquery.com/jquery-3.1.0.js"></script>
+    <!--Let browser know website is optimized for mobile-->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#8a4592"/>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/2.4.0/Chart.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/js/materialize.min.js"></script>
+    <link rel="manifest" href="manifest.json">
+  
+  </head>
+  <style type="text/css">
+   body{
+    background-image: linear-gradient(to bottom left, #8a4592, #35b0a9);
+  
+   }
+    .bg {
+      height: 100%;
+      background-image: linear-gradient(to top left, #8a4592, #35b0a9);
+    }
+  
+    nav {
+      background-image: linear-gradient(to top right, #35b0a9, #8a4592);
+      padding-left: 300px;
+    }
+  
+    .content {
+      padding-left: 300px;
+      height: 100%;
+    }
+  
+    .card-bg {
+      background: rgba(0, 0, 0, 0);
+    }
+  
+    @media only screen and (max-width: 992px) {
+  
+      .content,
+      nav {
+        padding-left: 0;
+      }
+    }
+  </style>
+  <script type="text/javascript">
+    $(document).ready(function () {
+      $('.sidenav').sidenav();
+    });
+  
+  </script>
+  
+  <body >
+    <div class="navbar-fixed">
+      <nav>
+        <div class="nav-wrapper" style="text-align: center;">
+  
+          <a href="" data-target="slide-out" class="sidenav-trigger"><i class="material-icons">menu</i></a>
+        </div>
+      </nav>
+    </div>
+    <ul class="sidenav sidenav-fixed bg" id="slide-out">
+      <li>
+        <div class="user-view">
+          
+          <a href="https://github.com/Alvarooo7/smart-car-wifi" target="_blank" ><img src="https://lh3.googleusercontent.com/-pWiBzKexWKQ/AAAAAAAAAAI/AAAAAAAAAAA/ACHi3rfX7mJq0-M-gLtQVVsaLrXYYQp_Qg/photo.jpg?sz=46" class="circle"></a>
+          <a href="https://github.com/Alvarooo7/smart-car-wifi" class="white-text name">Alvaro Pelaez</a>
+          <a href="https://github.com/Alvarooo7/smart-car-wifi" class="white-text email">N00122429</a>
+        </div>
+      </li>
+      <li><a href="" class="white-text"><i class="material-icons"> home</i>Dashboard</a></li>
+      <li><a href="alertas.html" class="white-text"><i class="material-icons">mail</i>Alertas</a></li>
+      <li><a href="configuracion.html" class="white-text"><i class="material-icons">settings</i>Configuración</a></li>
+    </ul>
+    <div class="content bg" id="content">
+      <div class="container">
+        <div class="row">
+          <div class="col s12">
+            <center>
+              <h2  id="tituloUser"  class="white-text">Bienvenido</h1>  
+              <div class="progress" id="progress">
+                
+              </div>
+              <h2>
+                 <button id="bt_connectAuto" type="button" style="background: none;border: none;" onclick="pilotoAutomatico();">
+                      <a class="btn-floating btn-large pulse waves-effect waves-light blue"><i class="material-icons">directions_car</i></a>
+                 </button>
+                <button id="bt_connect" type="button" style="background: none;border: none;" onclick="conectar();">
+                    <a class="btn-floating btn-large pulse waves-effect waves-light green"><i class="material-icons">power_settings_new</i></a>
+                </button>
+              </h2>
+            </center>
+          </div>
+          <div class="col s12 m6 l4">
+            <div class="card card-bg white-text">
+              <div id ="contenidoDinamicoVelocidad" class="card-content center">
+            
+
+              </div>
+            </div>
+          </div>
+          <div class="col s12 l4 m7">
+              <div class="card card-bg white-text">
+                <div id ="contenidoDinamicoTemperatura" class="card-content center">
+                
+                
+                
+                </div>
+              </div>
+          </div>
+          <div class="col s12 m6 l4">
+            <div class="card card-bg white-text">
+              <div id ="contenidoDinamico" class="card-content center">
+              
+               
+              
+              </div>
+            </div>
+          </div>
+  
+          </div>
+          <div class="row">
+              <center>
+                  <canvas id="remote"></canvas>
+              </center>
+          </div>
+          <input type="text" id="control" name="control"  > 
+        </div>
+  
+      </div>
+    </div>
+  
+    <style type="text/css">
+        .titulo{
+          font-size: 25px;
+          line-height: 23px;
+          
+        }
+     </style>
+  
+    <script src="https://www.gstatic.com/firebasejs/7.3.0/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/3.1.0/firebase-database.js"></script>
+    <script  src="index.js"></script>
+    <script src="main.js"></script>
+    <script>WatchTask();</script>
+    <script>
+      
+      var canvas_width = 350, canvas_height = 350;
+      var radio_base = 165;
+      var radio_handle = 79;
+      var radio_shaft = 130;
+      var rango = canvas_width/2 - 10;
+      var step = 18;
+      var ws;
+      var joystick = {x:0, y:0};
+      var click_state = 0;
+      var ratio = 1;
+  
+      function pilotoAutomatico(){
+        var controlOcupado= $("#control").val();
+        console.log(ws);
+        if(ws == null && controlOcupado==="0")
+        {
+          ws = "NO VACIO";
+          document.getElementById("progress").innerHTML = "<div class='indeterminate'></div>";
+          ws_onopenAuto();
+          document.getElementById("control").value = "2";
+          Socket.send("2");
+        }
+        else if(ws != null && controlOcupado==="2"){
+          document.getElementById("progress").innerHTML = "";
+        //document.getElementById("ws_state").innerHTML = "<font color='gray'>APAGADO</font>";
+        document.getElementById("bt_connectAuto").innerHTML = "<a class='btn-floating btn-large pulse waves-effect waves-light blue'><i class='material-icons'>directions_car</i></a>";
+        ws = null;
+        Socket.send("0");
+          
+        }
+      }
+  
+      function ws_onopenAuto()
+      {
+     
+        //document.getElementById("ws_state").innerHTML = "<font color='blue'>ENCENDIDO</font>";
+        document.getElementById("bt_connectAuto").innerHTML = "<a class='btn-floating btn-large waves-effect waves-light red'><i class='material-icons'>directions_car</i></a>";
+     
+      }
+      function ws_oncloseAuto()
+      {
+  
+        //document.getElementById("ws_state").innerHTML = "<font color='gray'>APAGADO</font>";
+        document.getElementById("bt_connectAuto").innerHTML = "<a class='btn-floating btn-large pulse waves-effect waves-light blue'><i class='material-icons'>directions_car</i></a>";
+  
+        
+      }
+      function ws_onmessageAuto(e_msg)
+      {
+        e_msg = e_msg || window.event; // MessageEvent
+        
+      }
+  
+      function inicio()
+      {
+        if( window.width>1024){
+        var width =  window.width;
+        var height =  window.height;
+        }else{
+        var width = $("#content").width();
+        var height = $("#content").height();
+        }
+        
+  
+        if(width < height)
+          ratio = (width - 50) / canvas_width;
+        else
+          ratio = (height - 50) / canvas_width;
+        
+        canvas_width = Math.round(canvas_width*ratio);
+        canvas_height = Math.round(canvas_height*ratio);
+        radio_base = Math.round(radio_base*ratio);
+        radio_handle = Math.round(radio_handle*ratio);
+        radio_shaft = Math.round(radio_shaft*ratio);
+        rango = Math.round(rango*ratio);
+        step = Math.round(step*ratio);
+        
+        var canvas = document.getElementById("remote");
+        canvas.width = canvas_width;
+        canvas.height = canvas_height;
+        
+        canvas.addEventListener("touchstart", mouse_down);
+        canvas.addEventListener("touchend", mouse_up);
+        canvas.addEventListener("touchmove", mouse_move);
+        canvas.addEventListener("mousedown", mouse_down);
+        canvas.addEventListener("mouseup", mouse_up);
+        canvas.addEventListener("mousemove", mouse_move);
+        
+        var ctx = canvas.getContext("2d");
+        ctx.translate(canvas_width/2, canvas_height/2);
+        ctx.shadowBlur = 20;
+        ctx.shadowColor = "LightGray";
+        ctx.lineCap="round";
+        ctx.lineJoin="round";
+          
+        actualizarVista();
+      }
+  
+  
+      function conectar()
+      {
+        var controlOcupado= $("#control").val();
+        if(ws == null && controlOcupado==="0")
+        {
+          ws = new WebSocket('ws://' + window.location.hostname + ':82');
+          document.getElementById("progress").innerHTML = "<div class='indeterminate'></div>";
+          ws.onopen = ws_onopen;
+          ws.onclose = ws_onclose;
+          ws.onmessage = ws_onmessage;
+        }
+        else if(ws != null && controlOcupado==="1"){
+          ws.close();
+        }
+  
+      }
+      function ws_onopen()
+      {
+     
+        //document.getElementById("ws_state").innerHTML = "<font color='blue'>ENCENDIDO</font>";
+        document.getElementById("bt_connect").innerHTML = "<a class='btn-floating btn-large waves-effect waves-light red'><i class='material-icons'>power_settings_new</i></a>";
+        actualizarVista();
+      }
+      function ws_onclose()
+      {
+        document.getElementById("progress").innerHTML = "";
+        //document.getElementById("ws_state").innerHTML = "<font color='gray'>APAGADO</font>";
+        document.getElementById("bt_connect").innerHTML = "<a class='btn-floating btn-large pulse waves-effect waves-light green'><i class='material-icons'>power_settings_new</i></a>";
+        
+        ws.onopen = null;
+        ws.onclose = null;
+        ws.onmessage = null;
+        ws = null;
+        actualizarVista();
+      }
+      function ws_onmessage(e_msg)
+      {
+        e_msg = e_msg || window.event; // MessageEvent
+        
+      }
+      function enviarDatos()
+      {
+        var x = joystick.x, y = joystick.y;
+        var joystick_rango = rango - radio_handle;
+        x = Math.round(x*100/joystick_rango);
+        y = Math.round(-(y*100/joystick_rango));
+        
+        if(ws != null)
+          ws.send(x + ":" + y + "\r\n");
+      }
+      function actualizarVista()
+      {
+        var x = joystick.x, y = joystick.y;
+        
+        var canvas = document.getElementById("remote");
+        var ctx = canvas.getContext("2d");
+        
+        ctx.clearRect(-canvas_width/2, -canvas_height/2, canvas_width, canvas_height);
+        
+        ctx.lineWidth = 3;
+      
+      
+        ctx.strokeStyle="black";
+        ctx.fillStyle = "hsl(0, 0%, 20%)";
+        ctx.beginPath();
+        ctx.fillRect(-250,-250,500,500);
+        ctx.stroke();
+        ctx.fill();
+      
+        ctx.strokeStyle="black";
+        ctx.fillStyle = "hsl(0, 0%, 35%)";
+        ctx.beginPath();
+        ctx.arc(0, 0, radio_base-25, 0, 2 * Math.PI);
+        ctx.stroke();
+        ctx.fill();
+        
+        ctx.strokeStyle="black";
+        
+        var lineWidth = radio_shaft;
+        var pre_x = pre_y = 0;
+        var x_end = x/5;
+        var y_end = y/5;
+        var max_count  = (radio_shaft - 10)/step;
+        var count = 1;
+        
+        while(lineWidth >= 10)
+        {
+          var cur_x = Math.round(count * x_end / max_count);
+          var cur_y = Math.round(count * y_end / max_count);
+          console.log(cur_x);
+          ctx.lineWidth = lineWidth;
+          ctx.beginPath();
+          ctx.lineTo(pre_x, pre_y);
+          ctx.lineTo(cur_x, cur_y);
+          ctx.stroke();
+          
+          lineWidth -= step;
+          pre_x = cur_x;
+          pre_y = cur_y;
+          count++;
+        }
+        
+        var x_start = Math.round(x / 3);
+        var y_start = Math.round(y / 3);
+        lineWidth += step;
+        
+        ctx.beginPath();
+        ctx.lineTo(pre_x, pre_y);
+        ctx.lineTo(x_start, y_start);
+        ctx.stroke();
+          
+        count = 1;
+        pre_x = x_start;
+        pre_y = y_start;
+        
+        while(lineWidth < radio_shaft)
+        {
+          var cur_x = Math.round(x_start + count * (x - x_start) / max_count);
+          var cur_y = Math.round(y_start + count * (y - y_start) / max_count);
+          ctx.lineWidth = lineWidth;
+          ctx.beginPath();
+          ctx.lineTo(pre_x, pre_y);
+          ctx.lineTo(cur_x, cur_y);
+          ctx.stroke();
+          
+          lineWidth += step;
+          pre_x = cur_x;
+          pre_y = cur_y;
+          count++;
+        }
+        
+        var grd = ctx.createRadialGradient(x, y, 0, x, y, radio_handle);
+        for(var i = 85; i >= 50; i-=5)
+          grd.addColorStop((85 - i)/35, "hsl(185, 50%, "+ i + "%)");
+          
+        ctx.fillStyle = grd;
+        ctx.beginPath();
+        ctx.arc(x, y, radio_handle, 0, 2 * Math.PI);
+        ctx.fill();
+      }
+      function procesarEvento(event)
+      {
+        var pos_x, pos_y;
+        if(event.offsetX)
+        {
+          pos_x = event.offsetX - canvas_width/2;
+          pos_y = event.offsetY - canvas_height/2;
+        }
+        else if(event.layerX)
+        {
+          pos_x = event.layerX - canvas_width/2;
+          pos_y = event.layerY - canvas_height/2;
+        }
+        else
+        {
+          pos_x = (Math.round(event.touches[0].pageX - event.touches[0].target.offsetLeft)) - canvas_width/2;
+          pos_y = (Math.round(event.touches[0].pageY - event.touches[0].target.offsetTop)) - canvas_height/2;
+        }
+        
+        return {x:pos_x, y:pos_y}
+      }
+      function mouse_down()
+      {
+        if(ws == null)
+          return;
+        
+        event.preventDefault();
+        
+        var pos = procesarEvento(event);
+        
+        var delta_x = pos.x - joystick.x;
+        var delta_y = pos.y - joystick.y;
+        
+        var dist = Math.sqrt(delta_x*delta_x + delta_y*delta_y);
+        
+        if(dist > radio_handle)
+          return;
+          
+        click_state = 1;
+        
+        var radio = Math.sqrt(pos.x*pos.x + pos.y*pos.y);
+        
+        if(radio <(rango - radio_handle))
+        {
+          joystick = pos;
+          enviarDatos();
+          actualizarVista();
+        }
+      }
+      function mouse_up()
+      {
+        event.preventDefault();
+        click_state = 0;
+      }
+      function mouse_move()
+      {
+        if(ws == null)
+          return; 
+        
+        event.preventDefault();
+        
+        if(!click_state)
+          return;
+        
+        var pos = procesarEvento(event);
+        
+        var radio = Math.sqrt(pos.x*pos.x + pos.y*pos.y);
+        
+        if(radio <(rango - radio_handle))
+        {
+          joystick = pos;
+          enviarDatos();
+          actualizarVista();
+        }
+      }
+      window.onload = inicio;
+      </script>
+  
+  
+  
+  
+  
+  
+  </body>
+  
+  </html>
