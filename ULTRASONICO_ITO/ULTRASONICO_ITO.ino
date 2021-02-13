@@ -21,6 +21,7 @@ const char* password = "XXXXXX";
 #define COLLISION_OCURRED true
 #define MAX_TEMPERATURE 30
 #define FORWARD_SPEED 17
+#define BACKWARD_SPEED 12
 #define LATERAL_SPEED 15
 
 long duration = 0;
@@ -325,31 +326,32 @@ const int leftPin[] = {0, 1, 0, 0};
 //FUNCIONES PARA ACCIONAR LOS MOTORES DE ACUERDO A LOS VALORES QUE SE ENVIAN POR MEDIO DEL JOYSTICK
 void forward() {
   Serial.println("forward");
-  speedy = 17;
+  speedy = FORWARD_SPEED;
   for (int i = 0; i < sizeof(pins); i++)
     digitalWrite(pins[i], forwardPin[i]);
 }
 
 void backward() {
   Serial.println("backward");
-  speedy = 12;
+  speedy = BACKWARD_SPEED;
   for (int i = 0; i < sizeof(pins); i++)
     digitalWrite(pins[i], backwardPin[i]);
 }
 
 void right() {
   Serial.println("right");
-  speedy = 15;
+  speedy = LATERAL_SPEED;
   for (int i = 0; i < sizeof(pins); i++)
     digitalWrite(pins[i], rightPin[i]);
 }
 
 void left() {
   Serial.println("left");
-  speedy = 15;
+  speedy = LATERAL_SPEED;
   for (int i = 0; i < sizeof(pins); i++)
     digitalWrite(pins[i], leftPin[i]);
 }
+
 void stopper() {
   Serial.println("stopper");
   speedy = 0;
