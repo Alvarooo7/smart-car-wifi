@@ -1,52 +1,48 @@
 #include <ESP8266WiFi.h>
 #include <WiFiClient.h>
 #include <ESP8266WebServer.h>
-#include <WebSocketsServer.h> 
+#include <WebSocketsServer.h>
 #include <Hash.h>
 #include <FS.h>
-#include <FirebaseArduino.h>
-//DHT 
+/**#include <FirebaseArduino.h>**/
 #include <DHT.h>
-// Definimos el pin digital donde se conecta el sensor
+
 #define DHTPIN 2
-// Dependiendo del tipo de sensor
 #define DHTTYPE DHT11
- 
-// Inicializamos el sensor DHT11
 DHT dht(DHTPIN, DHTTYPE);
+
 const char* ssid = "XXXXXX";
 const char* password = "XXXXXX";
 
 #define TRIGGER 16  //D0
 #define ECHO    5   //D1
+#define LIMIT_DISTANCE 15
+#define COLLISION_DISTANCE 6
+#define COLLISION_OCURRED true
+#define MAX_TEMPERATURE 30
+#define FORWARD_SPEED 17
+#define LATERAL_SPEED 15
 
-long duracion=0;
-int16_t distancia= 0; 
-int16_t ultimoValor = 0; 
-uint8_t contador = 0;  
+long duration = 0;
+int16_t distance = 0;
+int16_t lastDistance = 0;
+uint8_t counter = 0;
 
-float temperatura = 0;
-float ultimaTemperatura = 0;
+float temperature = 0;
+float lastTemperature = 0;
 
-String msj="";
-/*Movimiento */
-int velocidadMovimiento =0;
+int speedy = 0;
 
-/* Validad que solo un usuario controle el carro */
-int estadoControl=0;
+/* Estado de control del carro */
+int controlState = 0;
 // Valida envio
-short estadoChoque=0;
+boolean hasOcurredCollision = false;
 
-/* SECCIÓN MOTOR*/
-//Motor Derecha
-int OUTPUT4 = 14;
-int OUTPUT3 = 12;
-//MOTOR IZQUIERDA
-int OUTPUT2 = 4;
-int OUTPUT1 = 0;
+/**PINES 0 Y 4 RUEDAS left **/
+/**PINES 12 Y 14 RUEDAS right **/
+const int pins[] = {0, 4, 12, 14};
 
 WebSocketsServer webSocketMotor = WebSocketsServer(82);
-
 WebSocketsServer webSocket = WebSocketsServer(81);
 ESP8266WebServer server(80);
 
@@ -55,26 +51,39 @@ ESP8266WebServer server(80);
 #define FIREBASE_AUTH "XXXXXX"
 
 
-//Client Envio Alerta
-//WiFiClient client;
-
-void setup(void){
-  delay(1000);  
+void setup(void) {
+  delay(1000);
   Serial.begin(115200);
+  motorSetup();
+  temperatureSensorSetup();
+  ultrasonicSensorSetup();
+  internetSetup();
+  serverSetUp();
+  webSocketSetup();
+  //Firebase.begin(FIREBASE_HOST, FIREBASE_AUTH);
+}
 
-  //PINES MOTOR IZQ
-  pinMode (OUTPUT1, OUTPUT);
-  pinMode (OUTPUT2, OUTPUT);
- //PINES MOTOR DER
-  pinMode (OUTPUT4, OUTPUT);
-  pinMode (OUTPUT3, OUTPUT);
-  /* Inicializando DHT */
-  dht.begin();
-  /* Inicializando Pines Ultra */
-  pinMode(TRIGGER, OUTPUT);
-  pinMode(ECHO, INPUT);
+void serverSetUp() {
+  SPIFFS.begin();
+  server.onNotFound([]() {
+    if (!handleFileRead(server.uri()))
+      server.send(404, "text/plain", "Archivo no encontrado");
+  });
 
-  /* Inicializando Server */
+  server.begin();
+  Serial.println("Servidor HTTP iniciado");
+}
+
+void webSocketSetup() {
+  webSocketMotor.begin();
+  webSocketMotor.onEvent(webSocketEventMotor);
+
+  webSocket.begin();
+  webSocket.onEvent(webSocketEvent);
+
+}
+
+void internetSetup() {
   WiFi.begin(ssid, password);
   while (WiFi.status() != WL_CONNECTED) {
     delay(500);
@@ -83,214 +92,222 @@ void setup(void){
   IPAddress myIP = WiFi.localIP();
   Serial.print("IP: ");
   Serial.println(myIP);
-  
-  SPIFFS.begin();
-  webSocketMotor.begin();
-  webSocketMotor.onEvent(webSocketEventMotor); 
-  
-  webSocket.begin();
-  webSocket.onEvent(webSocketEvent);
-  
-  server.onNotFound([](){
-    if(!handleFileRead(server.uri()))
-      server.send(404, "text/plain", "Archivo no encontrado");
-  });
-  
-  server.begin();
-  Serial.println("Servidor HTTP iniciado");
+}
 
-  Firebase.begin(FIREBASE_HOST, FIREBASE_AUTH);
+void motorSetup() {
+  for (int i = 0; i < sizeof(pins); i++)
+    pinMode(pins[i], OUTPUT);
+}
+
+void ultrasonicSensorSetup() {
+  pinMode(TRIGGER, OUTPUT);
+  pinMode(ECHO, INPUT);
+}
+
+void temperatureSensorSetup() {
+  dht.begin();
 }
 
 void loop(void) {
-  
   webSocketMotor.loop();
   webSocket.loop();
   server.handleClient();
-  contador++;
-      if (contador == 255) {
-        contador = 0; 
-        /* ULTASONICO */
-        digitalWrite(TRIGGER, LOW);  
-        delayMicroseconds(2);     
-        digitalWrite(TRIGGER, HIGH);
-        delayMicroseconds(10);    
-        digitalWrite(TRIGGER, LOW);
-        duracion = pulseIn(ECHO, HIGH);
-        distancia = (duracion/2) / 29.15;    
-        if (distancia < 0) distancia = 0;
-          
-       //DHT 
-       //Leemos la temperatura en grados centígrados (por defecto)
-       temperatura = dht.readTemperature();
-       if ( isnan(temperatura)) temperatura=0;
+  counter++;
+  if (counter == 255) {
+    counter = 0;
+    measureDistanceInCentimeters();
+    measureTemperature();
+    sendDataToClient();
 
-          
-        //Mandando datos recolectados
-       if (distancia != ultimoValor || temperatura != ultimaTemperatura) {
-           msj = String(distancia)+"/"+String(temperatura)+"/"+String(velocidadMovimiento)+"/"+String(estadoControl);
-           webSocket.broadcastTXT(msj);  
-        }
+    if (controlState == 2)
+      goForwardAndStaySafe();
+    else
+      checkSafeDistanceAndTemperature();
 
-
-        if(estadoControl==2){pilotoAutomatico();}
-        else{ 
-          if((distancia<15 && velocidadMovimiento==17) || temperatura>30) {
-            parar();
-            if(distancia<=6 && estadoChoque==0 )  almacenarDatosChoque();
-            else if ((distancia>6 && estadoChoque==1) ) estadoChoque=0; 
-            }
-          }
-        
-        ultimoValor = distancia;
-        ultimaTemperatura = temperatura; 
-          
-      }
+    lastDistance = distance;
+    lastTemperature = temperature;
+  }
 
 }
 
+void checkSafeDistanceAndTemperature() {
+  if ((distance < LIMIT_DISTANCE && speedy == FORWARD_SPEED) || temperature > MAX_TEMPERATURE) {
+    stopper();
+    checkhasOcurredCollision();
+  }
+}
 
-void almacenarDatosChoque(){
+void checkhasOcurredCollision() {
+  if (distance <= COLLISION_DISTANCE && hasOcurredCollision == !COLLISION_OCURRED) almacenarDatosChoque();
+  else if (distance > COLLISION_DISTANCE && hasOcurredCollision == COLLISION_OCURRED) hasOcurredCollision = !COLLISION_OCURRED;
+}
 
-   String usuario = Firebase.getString("task/1/name");
-   Firebase.pushString("log/crack", "Accidente con "+usuario);
-  // handle error
-  if (Firebase.failed()) {
+void sendDataToClient() {
+  //Mandando datos recolectados
+  if (distance != lastDistance || temperature != lastTemperature) {
+    String data = String(distance) + "/" + String(temperature) + "/" + String(speedy) + "/" + String(controlState);
+    webSocket.broadcastTXT(data);
+  }
+}
+
+void measureDistanceInCentimeters() {
+  /* ULTASONICO */
+  digitalWrite(TRIGGER, HIGH);
+  delayMicroseconds(10);
+  digitalWrite(TRIGGER, LOW);
+  duration = pulseIn(ECHO, HIGH);
+  distance = duration / 58.2;
+  if (distance < 0) distance = 0;
+}
+
+void measureTemperature() {
+  //DHT
+  //Leemos la temperature en grados centígrados (por defecto)
+  temperature = dht.readTemperature();
+  if (isnan(temperature)) temperature = 0;
+}
+
+
+void almacenarDatosChoque() {
+  hasOcurredCollision = COLLISION_OCURRED;
+  /*
+    String usuario = Firebase.getString("task/1/name");
+    Firebase.pushString("log/crack", "Accidente con "+usuario);
+    // handle error
+    if (Firebase.failed()) {
       Serial.print("setting /message failed:");
-      Serial.println(Firebase.error());  
+      Serial.println(Firebase.error());
       return;
-  }
-  estadoChoque=1;
-  }
-
-void pilotoAutomatico (){
-
-    if(temperatura>30){parar();}
-    else if(distancia<15  && temperatura<31){
-      parar();
-      delay(200);
-      atras();
-      delay(2000);
-      izquierda();
-      delay(3000);
     }
-    else{
-    adelante();  
-    }
-  }
+  */
+}
 
+void goForwardAndStaySafe() {
+  if (temperature > MAX_TEMPERATURE)
+    stopper();
+  else if (distance < LIMIT_DISTANCE)
+    goToLeft();
+  else
+    forward();
+}
+
+void goToLeft() {
+  stopper();
+  delay(200);
+  backward();
+  delay(2000);
+  left();
+  delay(3000);
+}
 
 void webSocketEvent(uint8_t num, WStype_t type, uint8_t * payload, size_t lenght) {
 
-  switch(type) {
+  switch (type) {
     //En caso de que un cliente se desconecte del websocket
     case WStype_DISCONNECTED: {
-      Serial.printf("Usuario #%u - Desconectado\n", num);
-      break;
-    }
+        Serial.printf("Usuario #%u - Desconectado\n", num);
+        break;
+      }
     //Cuando un cliente se conecta al websocket presenta la información del cliente conectado, IP y ID
     case WStype_CONNECTED: {
-      IPAddress ip = webSocket.remoteIP(num);
-      Serial.printf("Nueva conexión: %d.%d.%d.%d Nombre: %s ID: %u\n", ip[0], ip[1], ip[2], ip[3], payload, num);
-      String msj = String(ultimoValor);
-      webSocket.broadcastTXT(msj);
-      break;
-    }
+        IPAddress ip = webSocket.remoteIP(num);
+        Serial.printf("Nueva conexión: %d.%d.%d.%d Nombre: %s ID: %u\n", ip[0], ip[1], ip[2], ip[3], payload, num);
+        String value = String(lastDistance);
+        webSocket.broadcastTXT(value);
+        break;
+      }
     //Caso para recibir información que se enviar vía el servidor Websocket
     case WStype_TEXT: {
-      String entrada = "";
-      for (int i = 0; i < lenght; i++) {
-        entrada.concat((char)payload[i]);
+        String entrada = "";
+        for (int i = 0; i < lenght; i++)
+          entrada.concat((char)payload[i]);
+
+        controlState = entrada.toInt();
+        if (controlState == 0)
+          stopper();
+
+        break;
       }
-     estadoControl=entrada.toInt();
-     if(estadoControl==0){parar();}
-      break;
-    }    
   }
 }
 
 
 //Funcion predefinida de un WebSocket
 void webSocketEventMotor(uint8_t num, WStype_t type, uint8_t * payload, size_t lenght) {
-  switch(type) {
+  switch (type) {
     //En caso de que un cliente se desconecte del websocket
     case WStype_DISCONNECTED: {
-      /*Serial.printf("Usuario2 #%u - Desconectado\n", num);*/
-      estadoControl=0;
-      break;
-    }
+        /*Serial.printf("Usuario2 #%u - Desconectado\n", num);*/
+        controlState = 0;
+        break;
+      }
     //Cuando un cliente se conecta al websocket presenta la información del cliente conectado, IP y ID
     case WStype_CONNECTED: {
-      estadoControl=1;
-      /*IPAddress ip = webSocketMotor.remoteIP(num);
-      Serial.printf("Nueva2 conexión: %d.%d.%d.%d Nombre: %s ID: %u\n", ip[0], ip[1], ip[2], ip[3], payload, num);*/
-      break;
-    }
+        controlState = 1;
+        /*IPAddress ip = webSocketMotor.remoteIP(num);
+          Serial.printf("Nueva2 conexión: %d.%d.%d.%d Nombre: %s ID: %u\n", ip[0], ip[1], ip[2], ip[3], payload, num);*/
+        break;
+      }
     //Caso para recibir información que se enviar vía el servidor Websocket
     case WStype_TEXT: {
-       String entrada = "";
-       //Se lee la entrada de datos y se concatena en la variable String entrada
-      for (int i = 0; i < lenght; i++) {
-        entrada.concat((char)payload[i]);
-      }
-      //Se separan los datos de la posicion X y Y del JoyStick
-      String data=entrada;
-      //Serial.print(data);
-      if(data){
-        int pos = data.indexOf(':');
-        long x = data.substring(0, pos).toInt();
-        long y = data.substring(pos+1).toInt();
-        //Imprime en Monitor Serial
-       /* Serial.print("x:");
-        Serial.print(x);
-        Serial.print(", y:");
-        Serial.println(y);*/
-        //De acuerdo al valor de X y Y del JoyStick, se ejecuta la funcion para habilitar los motores
-        if(((x<=50&&x>-50)&&(y<=50&&y>-50))){//PARAR
-          parar();velocidadMovimiento=0;
-        }else if(x>50&&(y<50||y>-50)){//DERECHA
-          derecha();velocidadMovimiento=15;
-        }else if(x<-50&&(y<50||y>-50)){//IZQUIERDA
-          izquierda();velocidadMovimiento=15;
-        }else if(y>50&&(x<50||x>-50)){// ADELANTE
-          velocidadMovimiento=17;
-          if(distancia>15) {adelante(); }
-          else{ parar(); }
-        }else if(y<-50&&(x<50||x>-50)){//ATRAS
-          velocidadMovimiento=12;
-          atras();
+        String data = "";
+        //Se lee la entrada de datos y se concatena en la variable String entrada
+        for (int i = 0; i < lenght; i++) {
+          data.concat((char)payload[i]);
         }
+        //Se separan los datos de la posicion X y Y del JoyStick
+        if (data) {
+          int pos = data.indexOf(':');
+          long x = data.substring(0, pos).toInt();
+          long y = data.substring(pos + 1).toInt();
+          executeCarMovement(x, y);
+        }
+        break;
       }
-      break;
-    }    
   }
 }
+//De acuerdo al valor de X y Y del JoyStick, se ejecuta la funcion para habilitar los motores
+void executeCarMovement(int x, int y) {
+  if (((x <= 50 && x > -50) && (y <= 50 && y > -50))) //stopper
+    stopper();
+  else if (x > 50 && (y < 50 || y > -50)) //right
+    right();
+  else if (x < -50 && (y < 50 || y > -50)) //left
+    left();
+  else if (y > 50 && (x < 50 || x > -50)) { // forward
+    if (distance > 15)
+      forward();
+    else
+      stopper();
+  } else if (y < -50 && (x < 50 || x > -50)) //backward
+    backward();
+}
 
-//FUNCION PARA IDENTIFICAR EL TIPO DE CONTENIDO DE LOS ARCHIVOS DEL SERVIDOR WEB 
-String getContentType(String filename){
-  if(server.hasArg("download")) return "application/octet-stream";
-  else if(filename.endsWith(".htm")) return "text/html";
-  else if(filename.endsWith(".html")) return "text/html";
-  else if(filename.endsWith(".css")) return "text/css";
-  else if(filename.endsWith(".js")) return "application/javascript";
-  else if(filename.endsWith(".png")) return "image/png";
-  else if(filename.endsWith(".gif")) return "image/gif";
-  else if(filename.endsWith(".jpg")) return "image/jpeg";
-  else if(filename.endsWith(".ico")) return "image/x-icon";
-  else if(filename.endsWith(".xml")) return "text/xml";
-  else if(filename.endsWith(".pdf")) return "application/x-pdf";
-  else if(filename.endsWith(".zip")) return "application/x-zip";
-  else if(filename.endsWith(".gz")) return "application/x-gzip";
+//FUNCION PARA IDENTIFICAR EL TIPO DE CONTENIDO DE LOS ARCHIVOS DEL SERVIDOR WEB
+String getContentType(String filename) {
+  if (server.hasArg("download")) return "application/octet-stream";
+  else if (filename.endsWith(".htm")) return "text/html";
+  else if (filename.endsWith(".html")) return "text/html";
+  else if (filename.endsWith(".css")) return "text/css";
+  else if (filename.endsWith(".js")) return "application/javascript";
+  else if (filename.endsWith(".png")) return "image/png";
+  else if (filename.endsWith(".gif")) return "image/gif";
+  else if (filename.endsWith(".jpg")) return "image/jpeg";
+  else if (filename.endsWith(".ico")) return "image/x-icon";
+  else if (filename.endsWith(".xml")) return "text/xml";
+  else if (filename.endsWith(".pdf")) return "application/x-pdf";
+  else if (filename.endsWith(".zip")) return "application/x-zip";
+  else if (filename.endsWith(".gz")) return "application/x-gzip";
   return "text/plain";
 }
 
 //FUNCION PARA CARGAR EL ARCHIVO DEL SERVIDOR WEB index.html
-bool handleFileRead(String path){
-  #ifdef DEBUG
-    Serial.println("handleFileRead: " + path);
-  #endif
-  if(path.endsWith("/")) path += "index.html";
-  if(SPIFFS.exists(path)){
+bool handleFileRead(String path) {
+#ifdef DEBUG
+  Serial.println("handleFileRead: " + path);
+#endif
+  if (path.endsWith("/")) path += "index.html";
+  if (SPIFFS.exists(path)) {
     File file = SPIFFS.open(path, "r");
     size_t sent = server.streamFile(file, getContentType(path));
     file.close();
@@ -299,43 +316,43 @@ bool handleFileRead(String path){
   return false;
 }
 
+/** MOVIMIENTO **/
+const int forwardPin[] = {1, 0, 0, 1};
+const int backwardPin[] = {0, 1, 1, 0};
+const int rightPin[] = {0, 0, 1, 0};
+const int leftPin[] = {0, 1, 0, 0};
+
 //FUNCIONES PARA ACCIONAR LOS MOTORES DE ACUERDO A LOS VALORES QUE SE ENVIAN POR MEDIO DEL JOYSTICK
-void adelante(){
-  // Serial.println("adelante");
-  digitalWrite(OUTPUT1, 1);
-  digitalWrite(OUTPUT2, 0);
-  digitalWrite(OUTPUT3, 0);
-  digitalWrite(OUTPUT4, 1);
-   
- 
-}
-void atras(){
-  Serial.println("atras");
-  digitalWrite(OUTPUT1, 0);
-   digitalWrite(OUTPUT2, 1);
-   digitalWrite(OUTPUT3, 1);
-   digitalWrite(OUTPUT4, 0);
+void forward() {
+  Serial.println("forward");
+  speedy = 17;
+  for (int i = 0; i < sizeof(pins); i++)
+    digitalWrite(pins[i], forwardPin[i]);
 }
 
-void derecha(){
-  Serial.println("derecha");
-  digitalWrite(OUTPUT1, 0);
-  digitalWrite(OUTPUT2, 0);
-  digitalWrite(OUTPUT3, 1);
-  digitalWrite(OUTPUT4, 0);
+void backward() {
+  Serial.println("backward");
+  speedy = 12;
+  for (int i = 0; i < sizeof(pins); i++)
+    digitalWrite(pins[i], backwardPin[i]);
 }
 
-void izquierda(){
-  Serial.println("izquierda");
-  digitalWrite(OUTPUT1, 0);
-  digitalWrite(OUTPUT2, 1);
-  digitalWrite(OUTPUT3, 0);
-  digitalWrite(OUTPUT4, 0);
+void right() {
+  Serial.println("right");
+  speedy = 15;
+  for (int i = 0; i < sizeof(pins); i++)
+    digitalWrite(pins[i], rightPin[i]);
 }
-void parar(){
-  Serial.println("parar");
-  digitalWrite(OUTPUT1, 0);
-  digitalWrite(OUTPUT2, 0);
-  digitalWrite(OUTPUT3, 0);
-  digitalWrite(OUTPUT4, 0);
+
+void left() {
+  Serial.println("left");
+  speedy = 15;
+  for (int i = 0; i < sizeof(pins); i++)
+    digitalWrite(pins[i], leftPin[i]);
+}
+void stopper() {
+  Serial.println("stopper");
+  speedy = 0;
+  for (int i = 0; i < sizeof(pins); i++)
+    digitalWrite(pins[i], 0);
 }
